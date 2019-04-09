@@ -31,7 +31,8 @@
 enum MsgTypes{
     JOINREQ,
     JOINREP,
-    DUMMYLASTMSGTYPE
+    DUMMYLASTMSGTYPE,
+    MEMBERSHIPLIST
 };
 
 /**
@@ -76,6 +77,9 @@ public:
 	void initMemberListTable(Member *memberNode);
 	void printAddress(Address *addr);
 	virtual ~MP1Node();
+	bool handleJoinRequest(void *env, char *data, int size);
+	bool handleMembershipUpdate(void *env, char *data, int size);
+	vector<MemberListEntry>::iterator find(int id, short port);
 };
 
 #endif /* _MP1NODE_H_ */
