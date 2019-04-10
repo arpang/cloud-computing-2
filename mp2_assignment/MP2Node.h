@@ -28,7 +28,7 @@ typedef struct {
     int successCount;
     int failureCount;
     bool logged;
-    map<string, int> readValue;
+    map<string, int> receivedValues;
 } transaction;
 
 /**

@@ -265,7 +265,12 @@ bool MP2Node::createKeyValue(string key, string value, ReplicaType replica) {
  * 			    2) Return value
  */
 string MP2Node::readKey(string key) {
-    return ht->read(key);
+    string entryString = ht->read(key);
+    if (entryString=="") {
+        return entryString;
+    }
+    Entry entry(entryString);
+    return entry.value;
 }
 
 /**
@@ -449,7 +454,6 @@ void MP2Node::replyHandler(Message replyMessage) {
     if (it == transactionTracker.end()) {
         return;
     }
-//    transaction t = it->second;
     Message message(it->second.message);
 
     if (!replyMessage.success) {
@@ -462,9 +466,6 @@ void MP2Node::replyHandler(Message replyMessage) {
     }
 
     it->second.successCount+=1;
-    char static data2[1000];
-    sprintf(data2, "for transID: %d successcount: %d", transID, it->second.successCount);
-    log->LOG(&memberNode->addr, data2);
     if (it->second.successCount == 2) {
         it->second.logged = true;
         logSuccessMessage(transID, message.key, message.value, message.type);
@@ -473,28 +474,42 @@ void MP2Node::replyHandler(Message replyMessage) {
 
 
 void MP2Node::readReplyHandler(Message replyMessage) {
-//    if (replyMessage.value == "") {
-//        return;
-//    }
-//    int transID = replyMessage.transID;
-//    string value = replyMessage.value;
-//    map<pair<int, string>, quorumCountStruct>::iterator it = readRequestTracker.find(pair<int, string>(transID, value));
-//    if (it == readRequestTracker.end()) {
-//        quorumCountStruct q;
-//        q.count = 1;
-//        q.timestamp = par->getcurrtime();
-//        readRequestTracker.emplace(pair<int, string>(transID, value), q);
-//        return;
-//    }
-//
-//    it->second.count = it->second.count + 1;
-//    if (it->second.count == 2) {
-//        map<int, string>::iterator it2 = transactionTracker.find(transID);
-//        if (it2!=transactionTracker.end()) {
-//            Message message = Message(it2->second);
-//            logSuccessMessage(transID, message.key, message.value, message.type);
-//        }
-//    }
+    char static data[1000];
+    sprintf(data, "readReplyHandler replyMessage: %s transID: %d value:%s", replyMessage.toString().c_str(), replyMessage.transID, replyMessage.value.c_str());
+    log->LOG(&memberNode->addr, data);
+
+    int transID = replyMessage.transID;
+    string readValue = replyMessage.value;
+    map<int, transaction>::iterator it = transactionTracker.find(transID);
+
+    if (it == transactionTracker.end()) {
+        return;
+    }
+    Message message(it->second.message);
+
+    if (readValue == "") {
+        it->second.failureCount +=1;
+        if (it->second.failureCount == 2) {
+            it->second.logged = true;
+            logFailureMessage(transID, message.key, message.value, message.type);
+        }
+        return;
+    }
+
+    it->second.successCount+=1;
+    map<string, int>::iterator it2 = it->second.receivedValues.find(readValue);
+    if (it2 == it->second.receivedValues.end()) {
+        it->second.receivedValues[readValue] = 1;
+        return;
+    }
+    it2->second+=1;
+    char static data2[1000];
+    sprintf(data2, "readReplyHandler value: %s count: %d", it2->first.c_str(), it2->second);
+    log->LOG(&memberNode->addr, data2);
+    if (it2->second == 2) {
+        it->second.logged = true;
+        logSuccessMessage(transID, message.key, readValue, message.type);
+    }
 }
 
 /**
