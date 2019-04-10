@@ -18,6 +18,18 @@
 #include "Params.h"
 #include "Message.h"
 #include "Queue.h"
+#include <unordered_map>
+#include<string>
+
+
+typedef struct {
+    string message;
+    int timestamp;
+    int successCount;
+    int failureCount;
+    bool logged;
+    map<string, int> readValue;
+} transaction;
 
 /**
  * CLASS NAME: MP2Node
@@ -47,6 +59,8 @@ private:
 	EmulNet * emulNet;
 	// Object of Log
 	Log * log;
+	map<int, transaction> transactionTracker;
+
 
 public:
 	MP2Node(Member *memberNode, Params *par, EmulNet *emulNet, Log *log, Address *addressOfMember);
@@ -88,7 +102,19 @@ public:
 	// stabilization protocol - handle multiple failures
 	void stabilizationProtocol();
 
+    void sendMessageToReplicas(Message message);
+    void createHandler(Message message);
+    void updateHandler(Message message);
+    void deleteHandler(Message message);
+    void readHandler(Message message);
+    void replyHandler(Message message);
+    void readReplyHandler(Message message);
+	void logSuccessMessage(int transID, string key, string value, MessageType messageType);
+	void logFailureMessage(int transID, string key, string value, MessageType messageType);
+    transaction initializeTransaction(Message message);
 	~MP2Node();
 };
+
+
 
 #endif /* MP2NODE_H_ */
