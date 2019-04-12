@@ -12,9 +12,6 @@
 static int QUORUM = 2;
 static int timeout = 20;
 
-// todo: stabalization protocol: stabalization frequency?
-// todo: cleanup after timeout
-
 /**
  *  char static data[1000];
     string tmp = message.toString();
@@ -140,10 +137,6 @@ size_t MP2Node::hashFunction(string key) {
 }
 
 void MP2Node::dispatchMessages(Message message) {
-//    char static data[1000];
-//    sprintf(data, "dispatchMessages message: %s", message.toString().c_str());
-//    log->LOG(&memberNode->addr, data);
-
     vector<Node> replicas = findNodes(message.key);
     vector<Node>::iterator it;
 
@@ -183,9 +176,6 @@ transaction MP2Node::initializeTransaction(Message message) {
  * 				3) Sends a message to the replica
  */
 void MP2Node::clientCreate(string key, string value) {
-//    char static data[1000];
-//    sprintf(data, "clientCreate key: %s value: %s", key.c_str(), value.c_str());
-//    log->LOG(&memberNode->addr, data);
     Message message(g_transID, memberNode->addr, CREATE, key, value);
     transactionTracker.emplace(g_transID, initializeTransaction(message));
     g_transID += 1;
@@ -323,10 +313,6 @@ void MP2Node::checkMessages() {
         string messageString(data, data + size);
         Message message = Message(messageString);
 
-//        char static data[1000];
-//        sprintf(data, "checkMessages: %s", message.toString().c_str());
-//        log->LOG(&memberNode->addr, data);
-
         if (message.type == CREATE) {
             createHandler(message);
         } else if (message.type == UPDATE) {
@@ -340,9 +326,6 @@ void MP2Node::checkMessages() {
         } else if (message.type == READREPLY) {
             readReplyHandler(message);
         }
-        /*
-         * Handle the message types here
-         */
     }
 
     /*
@@ -363,9 +346,6 @@ void MP2Node::checkMessages() {
 }
 
 void MP2Node::createHandler(Message message) {
-//    char static data[1000];
-//    sprintf(data, "createHandler message: %s", message.toString().c_str());
-//    log->LOG(&memberNode->addr, data);
     string key = message.key;
     string value = message.value;
     int transID = message.transID;
@@ -425,9 +405,6 @@ void MP2Node::readHandler(Message message) {
 }
 
 void MP2Node::logSuccessMessage(int transID, string key, string value, MessageType messageType) {
-//    char static data[1000];
-//    sprintf(data, "logSuccessMessage transID: %d key: %s", transID, key.c_str());
-//    log->LOG(&memberNode->addr, data);
     if (messageType == CREATE) {
         log->logCreateSuccess(&memberNode->addr, true, transID, key, value);
     } else if (messageType == UPDATE) {
@@ -452,10 +429,6 @@ void MP2Node::logFailureMessage(int transID, string key, string value, MessageTy
 }
 
 void MP2Node::replyHandler(Message replyMessage) {
-//    char static data[1000];
-//    sprintf(data, "replyHandler replyMessage: %s transID: %d", replyMessage.toString().c_str(), replyMessage.transID);
-//    log->LOG(&memberNode->addr, data);
-
     int transID = replyMessage.transID;
     map<int, transaction>::iterator it = transactionTracker.find(transID);
 
@@ -487,10 +460,6 @@ void MP2Node::replyHandler(Message replyMessage) {
 
 
 void MP2Node::readReplyHandler(Message replyMessage) {
-//    char static data[1000];
-//    sprintf(data, "readReplyHandler replyMessage: %s transID: %d value:%s", replyMessage.toString().c_str(), replyMessage.transID, replyMessage.value.c_str());
-//    log->LOG(&memberNode->addr, data);
-
     int transID = replyMessage.transID;
     string readValue = replyMessage.value;
     map<int, transaction>::iterator it = transactionTracker.find(transID);
@@ -521,9 +490,6 @@ void MP2Node::readReplyHandler(Message replyMessage) {
         return;
     }
     it2->second+=1;
-//    char static data2[1000];
-//    sprintf(data2, "readReplyHandler value: %s count: %d", it2->first.c_str(), it2->second);
-//    log->LOG(&memberNode->addr, data2);
     if (it2->second == 2) {
         it->second.logged = true;
         logSuccessMessage(transID, message.key, readValue, message.type);
@@ -585,10 +551,6 @@ int MP2Node::enqueueWrapper(void *env, char *buff, int size) {
 }
 
 ReplicaType MP2Node::getUpdatedReplicaType(vector<Node> replicas) {
-    char static data[1000];
-    sprintf(data, "getUpdatedReplicaType replica size: %d", replicas.size());
-    log->LOG(&memberNode->addr, data);
-
     if(strcmp(replicas.at(0).nodeAddress.addr, memberNode->addr.addr)==0) {
         return PRIMARY;
     }
@@ -601,9 +563,6 @@ ReplicaType MP2Node::getUpdatedReplicaType(vector<Node> replicas) {
 }
 
 int MP2Node::myIndex() {
-    char static data[1000];
-    sprintf(data, "myindex");
-    log->LOG(&memberNode->addr, data);
     int i = 0;
     while (i < ring.size()) {
         if(strcmp(ring.at(i).nodeAddress.addr, memberNode->addr.addr) == 0) {
@@ -615,9 +574,6 @@ int MP2Node::myIndex() {
 }
 
 bool MP2Node::isOneAfterUpdated(int index) {
-    char static data[1000];
-    sprintf(data, "isOneAfterUpdated index: %d, ring size: %d, hasMyReplicas size: %d ", index, ring.size(), hasMyReplicas.size());
-    log->LOG(&memberNode->addr, data);
     if (strcmp(ring.at((index+1) % ring.size()).nodeAddress.addr, hasMyReplicas.at(0).nodeAddress.addr) != 0) {
         hasMyReplicas.at(0) = ring.at((index+1) % ring.size());
         return true;
@@ -627,21 +583,14 @@ bool MP2Node::isOneAfterUpdated(int index) {
 }
 
 bool MP2Node::isTwoAfterUpdated(int index) {
-    char static data[1000];
-    sprintf(data, "isTwoAfterUpdated index: %d", index);
-    log->LOG(&memberNode->addr, data);
     if (strcmp(ring.at((index+2) % ring.size()).nodeAddress.addr, hasMyReplicas.at(1).nodeAddress.addr) != 0) {
         hasMyReplicas.at(1) = ring.at((index+2) % ring.size());
         return true;
     }
-
     return false;
 }
 
 bool MP2Node::isOneBeforeUpdated(int index) {
-    char static data[1000];
-    sprintf(data, "isOneBeforeUpdated index: %d", index);
-    log->LOG(&memberNode->addr, data);
     if (strcmp(ring.at((index-1+ring.size()) % ring.size()).nodeAddress.addr, haveReplicasOf.at(0).nodeAddress.addr) != 0) {
         haveReplicasOf.at(0) = ring.at((index-1+ring.size()) % ring.size());
         return true;
@@ -650,10 +599,6 @@ bool MP2Node::isOneBeforeUpdated(int index) {
 }
 
 bool MP2Node::isTwoBeforeUpdated(int index) {
-    char static data[1000];
-    sprintf(data, "isTwoBeforeUpdated index: %d", index);
-    log->LOG(&memberNode->addr, data);
-
     if (strcmp(ring.at((index-2+ring.size()) % ring.size()).nodeAddress.addr, haveReplicasOf.at(1).nodeAddress.addr) != 0) {
         haveReplicasOf.at(1) = ring.at((index-2+ring.size()) % ring.size());
         return true;
@@ -662,10 +607,6 @@ bool MP2Node::isTwoBeforeUpdated(int index) {
 }
 
 void MP2Node::dispatchMessage(Message message, int index) {
-    char static data[1000];
-    sprintf(data, "dispatchMessage message: %s", message.toString().c_str());
-    log->LOG(&memberNode->addr, data);
-
     vector<Node> replicas = findNodes(message.key);
     vector<Node>::iterator it;
 
@@ -692,12 +633,16 @@ void MP2Node::dispatchMessage(Message message, int index) {
  *				Note:- "CORRECT" replicas implies that every key is replicated in its two neighboring nodes in the ring
  */
 void MP2Node::stabilizationProtocol() {
-    /*
-     * Implement this
+    /**
+     *  1. Do internal shuffling.
+     *  2. If nodes containing replicas have changed (including the case when I am a new node):
+     *      (a) If secondary replica has changed: send entire of my primary content to it
+     *      (b) If tertiary replica has changed: send entire of my primary content to it
+     *  3. If nodes whose replicas I have, have changed:
+     *      (a) If one before has changed: send entire of secondary content to it
+     *      (b) If two before has changed: send entire of tertiary content to it
+     *  4. Update hasReplicas and haveReplicasOf
      */
-    char static data[1000];
-    sprintf(data, "stabilizationProtocol ring size: %d", ring.size());
-    log->LOG(&memberNode->addr, data);
 
     if (ring.size() < 3) {
         return;
@@ -726,8 +671,8 @@ void MP2Node::stabilizationProtocol() {
     bool twoBeforeUpdated;
 
     if (hasMyReplicas.size() == 0) {
-//        hasMyReplicas.at(0) = ring.at((index+1) % ring.size());
-//        hasMyReplicas.at(1) = ring.at((index+2) % ring.size());
+        hasMyReplicas.emplace_back(ring.at((index+1) % ring.size()));
+        hasMyReplicas.emplace_back(ring.at((index+2) % ring.size()));
         oneAfterUpdated = true;
         twoAfterUpdated = true;
     } else {
@@ -736,8 +681,8 @@ void MP2Node::stabilizationProtocol() {
     }
 
     if (haveReplicasOf.size() == 0) {
-//        haveReplicasOf.at(0) = ring.at((index-1+ring.size()) % ring.size());
-//        haveReplicasOf.at(1) = ring.at((index-2+ring.size()) % ring.size());
+        haveReplicasOf.emplace_back(ring.at((index-1+ring.size()) % ring.size()));
+        haveReplicasOf.emplace_back(ring.at((index-2+ring.size()) % ring.size()));
         oneBeforeUpdated = true;
         twoBeforeUpdated = true;
     } else {
