@@ -89,6 +89,7 @@ public:
 
 	// coordinator dispatches messages to corresponding nodes
 	void dispatchMessages(Message message);
+    void dispatchMessage(Message message, int index);
 
 	// find the addresses of nodes that are responsible for a key
 	vector<Node> findNodes(string key);
@@ -102,7 +103,6 @@ public:
 	// stabilization protocol - handle multiple failures
 	void stabilizationProtocol();
 
-    void sendMessageToReplicas(Message message);
     void createHandler(Message message);
     void updateHandler(Message message);
     void deleteHandler(Message message);
@@ -112,7 +112,13 @@ public:
 	void logSuccessMessage(int transID, string key, string value, MessageType messageType);
 	void logFailureMessage(int transID, string key, string value, MessageType messageType);
     transaction initializeTransaction(Message message);
-	~MP2Node();
+	bool isOneAfterUpdated(int index);
+	bool isTwoAfterUpdated(int index);
+	bool isOneBeforeUpdated(int index);
+	bool isTwoBeforeUpdated(int index);
+	int myIndex();
+	ReplicaType getUpdatedReplicaType(vector<Node> replicas);
+    ~MP2Node();
 };
 
 

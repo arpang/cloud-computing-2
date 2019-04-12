@@ -12,7 +12,7 @@
 static int QUORUM = 2;
 static int timeout = 20;
 
-// todo: stabalization protocol
+// todo: stabalization protocol: stabalization frequency?
 // todo: cleanup after timeout
 
 /**
@@ -78,7 +78,7 @@ void MP2Node::updateRing() {
         it2 = curMemList.begin();
         it1 = ring.begin();
         while (it1 != ring.end()) {
-            if (it1->getHashCode() != it2->getHashCode()) {
+            if (strcmp(it1->nodeAddress.addr, it2->nodeAddress.addr) != 0) {
                 change = true;
                 break;
             }
@@ -139,10 +139,10 @@ size_t MP2Node::hashFunction(string key) {
     return ret % RING_SIZE;
 }
 
-void MP2Node::sendMessageToReplicas(Message message) {
-    char static data[1000];
-    sprintf(data, "sendMessageToReplicas message: %s", message.toString().c_str());
-    log->LOG(&memberNode->addr, data);
+void MP2Node::dispatchMessages(Message message) {
+//    char static data[1000];
+//    sprintf(data, "dispatchMessages message: %s", message.toString().c_str());
+//    log->LOG(&memberNode->addr, data);
 
     vector<Node> replicas = findNodes(message.key);
     vector<Node>::iterator it;
@@ -183,13 +183,13 @@ transaction MP2Node::initializeTransaction(Message message) {
  * 				3) Sends a message to the replica
  */
 void MP2Node::clientCreate(string key, string value) {
-    char static data[1000];
-    sprintf(data, "clientCreate key: %s value: %s", key.c_str(), value.c_str());
-    log->LOG(&memberNode->addr, data);
+//    char static data[1000];
+//    sprintf(data, "clientCreate key: %s value: %s", key.c_str(), value.c_str());
+//    log->LOG(&memberNode->addr, data);
     Message message(g_transID, memberNode->addr, CREATE, key, value);
     transactionTracker.emplace(g_transID, initializeTransaction(message));
     g_transID += 1;
-    sendMessageToReplicas(message);
+    dispatchMessages(message);
 }
 
 /**
@@ -205,7 +205,7 @@ void MP2Node::clientRead(string key) {
     Message message = Message(g_transID, memberNode->addr, READ, key);
     transactionTracker.emplace(g_transID, initializeTransaction(message));
     g_transID += 1;
-    sendMessageToReplicas(message);
+    dispatchMessages(message);
 }
 
 /**
@@ -221,7 +221,7 @@ void MP2Node::clientUpdate(string key, string value) {
     Message message = Message(g_transID, memberNode->addr, UPDATE, key, value);
     transactionTracker.emplace(g_transID, initializeTransaction(message));
     g_transID += 1;
-    sendMessageToReplicas(message);
+    dispatchMessages(message);
 }
 
 /**
@@ -237,7 +237,7 @@ void MP2Node::clientDelete(string key) {
     Message message = Message(g_transID, memberNode->addr, DELETE, key);
     transactionTracker.emplace(g_transID, initializeTransaction(message));
     g_transID += 1;
-    sendMessageToReplicas(message);
+    dispatchMessages(message);
 }
 
 /**
@@ -249,9 +249,6 @@ void MP2Node::clientDelete(string key) {
  * 			   	2) Return true or false based on success or failure
  */
 bool MP2Node::createKeyValue(string key, string value, ReplicaType replica) {
-    char static data[1000];
-    sprintf(data, "createKeyValue key: %s value: %s", key.c_str(), value.c_str());
-    log->LOG(&memberNode->addr, data);
     Entry entry = Entry(value, par->getcurrtime(), replica);
     return ht->create(key, entry.convertToString());
 }
@@ -326,9 +323,9 @@ void MP2Node::checkMessages() {
         string messageString(data, data + size);
         Message message = Message(messageString);
 
-        char static data[1000];
-        sprintf(data, "checkMessages: %s", message.toString().c_str());
-        log->LOG(&memberNode->addr, data);
+//        char static data[1000];
+//        sprintf(data, "checkMessages: %s", message.toString().c_str());
+//        log->LOG(&memberNode->addr, data);
 
         if (message.type == CREATE) {
             createHandler(message);
@@ -352,12 +349,23 @@ void MP2Node::checkMessages() {
      * This function should also ensure all READ and UPDATE operation
      * get QUORUM replies
      */
+    map<int, transaction>::iterator it;
+    for(it = transactionTracker.begin(); it!=transactionTracker.end(); ++it) {
+        if(it->second.logged) {
+            continue;
+        }
+        Message message(it->second.message);
+        if(par->getcurrtime() - it->second.timestamp > timeout) {
+            it->second.logged = true;
+            logFailureMessage(it->first, message.key, message.value, message.type);
+        }
+    }
 }
 
 void MP2Node::createHandler(Message message) {
-    char static data[1000];
-    sprintf(data, "createHandler message: %s", message.toString().c_str());
-    log->LOG(&memberNode->addr, data);
+//    char static data[1000];
+//    sprintf(data, "createHandler message: %s", message.toString().c_str());
+//    log->LOG(&memberNode->addr, data);
     string key = message.key;
     string value = message.value;
     int transID = message.transID;
@@ -417,9 +425,9 @@ void MP2Node::readHandler(Message message) {
 }
 
 void MP2Node::logSuccessMessage(int transID, string key, string value, MessageType messageType) {
-    char static data[1000];
-    sprintf(data, "logSuccessMessage transID: %d key: %s", transID, key.c_str());
-    log->LOG(&memberNode->addr, data);
+//    char static data[1000];
+//    sprintf(data, "logSuccessMessage transID: %d key: %s", transID, key.c_str());
+//    log->LOG(&memberNode->addr, data);
     if (messageType == CREATE) {
         log->logCreateSuccess(&memberNode->addr, true, transID, key, value);
     } else if (messageType == UPDATE) {
@@ -444,9 +452,9 @@ void MP2Node::logFailureMessage(int transID, string key, string value, MessageTy
 }
 
 void MP2Node::replyHandler(Message replyMessage) {
-    char static data[1000];
-    sprintf(data, "replyHandler replyMessage: %s transID: %d", replyMessage.toString().c_str(), replyMessage.transID);
-    log->LOG(&memberNode->addr, data);
+//    char static data[1000];
+//    sprintf(data, "replyHandler replyMessage: %s transID: %d", replyMessage.toString().c_str(), replyMessage.transID);
+//    log->LOG(&memberNode->addr, data);
 
     int transID = replyMessage.transID;
     map<int, transaction>::iterator it = transactionTracker.find(transID);
@@ -454,6 +462,11 @@ void MP2Node::replyHandler(Message replyMessage) {
     if (it == transactionTracker.end()) {
         return;
     }
+
+    if (it->second.logged) {
+        return;
+    }
+
     Message message(it->second.message);
 
     if (!replyMessage.success) {
@@ -474,9 +487,9 @@ void MP2Node::replyHandler(Message replyMessage) {
 
 
 void MP2Node::readReplyHandler(Message replyMessage) {
-    char static data[1000];
-    sprintf(data, "readReplyHandler replyMessage: %s transID: %d value:%s", replyMessage.toString().c_str(), replyMessage.transID, replyMessage.value.c_str());
-    log->LOG(&memberNode->addr, data);
+//    char static data[1000];
+//    sprintf(data, "readReplyHandler replyMessage: %s transID: %d value:%s", replyMessage.toString().c_str(), replyMessage.transID, replyMessage.value.c_str());
+//    log->LOG(&memberNode->addr, data);
 
     int transID = replyMessage.transID;
     string readValue = replyMessage.value;
@@ -485,6 +498,11 @@ void MP2Node::readReplyHandler(Message replyMessage) {
     if (it == transactionTracker.end()) {
         return;
     }
+
+    if (it->second.logged) {
+        return;
+    }
+
     Message message(it->second.message);
 
     if (readValue == "") {
@@ -503,9 +521,9 @@ void MP2Node::readReplyHandler(Message replyMessage) {
         return;
     }
     it2->second+=1;
-    char static data2[1000];
-    sprintf(data2, "readReplyHandler value: %s count: %d", it2->first.c_str(), it2->second);
-    log->LOG(&memberNode->addr, data2);
+//    char static data2[1000];
+//    sprintf(data2, "readReplyHandler value: %s count: %d", it2->first.c_str(), it2->second);
+//    log->LOG(&memberNode->addr, data2);
     if (it2->second == 2) {
         it->second.logged = true;
         logSuccessMessage(transID, message.key, readValue, message.type);
@@ -566,6 +584,104 @@ int MP2Node::enqueueWrapper(void *env, char *buff, int size) {
     return q.enqueue((queue<q_elt> *) env, (void *) buff, size);
 }
 
+ReplicaType MP2Node::getUpdatedReplicaType(vector<Node> replicas) {
+    char static data[1000];
+    sprintf(data, "getUpdatedReplicaType replica size: %d", replicas.size());
+    log->LOG(&memberNode->addr, data);
+
+    if(strcmp(replicas.at(0).nodeAddress.addr, memberNode->addr.addr)==0) {
+        return PRIMARY;
+    }
+    if(strcmp(replicas.at(1).nodeAddress.addr, memberNode->addr.addr)==0) {
+        return SECONDARY;
+    }
+    if(strcmp(replicas.at(2).nodeAddress.addr, memberNode->addr.addr)==0) {
+        return TERTIARY;
+    }
+}
+
+int MP2Node::myIndex() {
+    char static data[1000];
+    sprintf(data, "myindex");
+    log->LOG(&memberNode->addr, data);
+    int i = 0;
+    while (i < ring.size()) {
+        if(strcmp(ring.at(i).nodeAddress.addr, memberNode->addr.addr) == 0) {
+            break;
+        }
+        i+=1;
+    }
+    return i;
+}
+
+bool MP2Node::isOneAfterUpdated(int index) {
+    char static data[1000];
+    sprintf(data, "isOneAfterUpdated index: %d, ring size: %d, hasMyReplicas size: %d ", index, ring.size(), hasMyReplicas.size());
+    log->LOG(&memberNode->addr, data);
+    if (strcmp(ring.at((index+1) % ring.size()).nodeAddress.addr, hasMyReplicas.at(0).nodeAddress.addr) != 0) {
+        hasMyReplicas.at(0) = ring.at((index+1) % ring.size());
+        return true;
+    }
+
+    return false;
+}
+
+bool MP2Node::isTwoAfterUpdated(int index) {
+    char static data[1000];
+    sprintf(data, "isTwoAfterUpdated index: %d", index);
+    log->LOG(&memberNode->addr, data);
+    if (strcmp(ring.at((index+2) % ring.size()).nodeAddress.addr, hasMyReplicas.at(1).nodeAddress.addr) != 0) {
+        hasMyReplicas.at(1) = ring.at((index+2) % ring.size());
+        return true;
+    }
+
+    return false;
+}
+
+bool MP2Node::isOneBeforeUpdated(int index) {
+    char static data[1000];
+    sprintf(data, "isOneBeforeUpdated index: %d", index);
+    log->LOG(&memberNode->addr, data);
+    if (strcmp(ring.at((index-1+ring.size()) % ring.size()).nodeAddress.addr, haveReplicasOf.at(0).nodeAddress.addr) != 0) {
+        haveReplicasOf.at(0) = ring.at((index-1+ring.size()) % ring.size());
+        return true;
+    }
+    return false;
+}
+
+bool MP2Node::isTwoBeforeUpdated(int index) {
+    char static data[1000];
+    sprintf(data, "isTwoBeforeUpdated index: %d", index);
+    log->LOG(&memberNode->addr, data);
+
+    if (strcmp(ring.at((index-2+ring.size()) % ring.size()).nodeAddress.addr, haveReplicasOf.at(1).nodeAddress.addr) != 0) {
+        haveReplicasOf.at(1) = ring.at((index-2+ring.size()) % ring.size());
+        return true;
+    }
+    return false;
+}
+
+void MP2Node::dispatchMessage(Message message, int index) {
+    char static data[1000];
+    sprintf(data, "dispatchMessage message: %s", message.toString().c_str());
+    log->LOG(&memberNode->addr, data);
+
+    vector<Node> replicas = findNodes(message.key);
+    vector<Node>::iterator it;
+
+    if (index == 0) {
+        message.replica = PRIMARY;
+    } else if (index == 1) {
+        message.replica = SECONDARY;
+    } else if (index == 2) {
+        message.replica = TERTIARY;
+    }
+
+    Node replicaNode = replicas.at(index);
+    string messageContent = message.toString();
+    emulNet->ENsend(&memberNode->addr, replicaNode.getAddress(), (char *) messageContent.c_str(), messageContent.length());
+}
+
 /**
  * FUNCTION NAME: stabilizationProtocol
  *
@@ -579,9 +695,78 @@ void MP2Node::stabilizationProtocol() {
     /*
      * Implement this
      */
-    /**
-     * 1->2->3->4->5
-     *
-     * let's say 3 gets killed
-     */
+    char static data[1000];
+    sprintf(data, "stabilizationProtocol ring size: %d", ring.size());
+    log->LOG(&memberNode->addr, data);
+
+    if (ring.size() < 3) {
+        return;
+    }
+    map<string, string>::iterator it;
+
+    for (it = ht->hashTable.begin(); it != ht->hashTable.end(); ++it) {
+        vector<Node> replicas = findNodes(it->first);
+        Entry entry(it->second);
+        ReplicaType newReplicaType = getUpdatedReplicaType(replicas);
+
+        if (entry.replica != newReplicaType) {
+            entry.replica = newReplicaType;
+            it->second = entry.convertToString();
+        }
+    }
+
+    int index = myIndex();
+    if (index == ring.size()) {
+        return;
+    }
+
+    bool oneAfterUpdated;
+    bool twoAfterUpdated;
+    bool oneBeforeUpdated;
+    bool twoBeforeUpdated;
+
+    if (hasMyReplicas.size() == 0) {
+//        hasMyReplicas.at(0) = ring.at((index+1) % ring.size());
+//        hasMyReplicas.at(1) = ring.at((index+2) % ring.size());
+        oneAfterUpdated = true;
+        twoAfterUpdated = true;
+    } else {
+        oneAfterUpdated = isOneAfterUpdated(index);
+        twoAfterUpdated = isTwoAfterUpdated(index);
+    }
+
+    if (haveReplicasOf.size() == 0) {
+//        haveReplicasOf.at(0) = ring.at((index-1+ring.size()) % ring.size());
+//        haveReplicasOf.at(1) = ring.at((index-2+ring.size()) % ring.size());
+        oneBeforeUpdated = true;
+        twoBeforeUpdated = true;
+    } else {
+        oneBeforeUpdated = isOneBeforeUpdated(index);
+        twoBeforeUpdated = isTwoBeforeUpdated(index);
+    }
+
+    for (it = ht->hashTable.begin(); it != ht->hashTable.end(); ++it) {
+        string key = it->first;
+        Entry entry(it->second);
+        Message message(0, memberNode->addr, CREATE, key, entry.value);
+
+        if (entry.replica == PRIMARY) {
+            if (oneAfterUpdated) {
+                dispatchMessage(message, 1);
+            }
+
+            if (twoAfterUpdated) {
+                dispatchMessage(message, 2);
+            }
+        }
+
+        if (entry.replica == SECONDARY && oneBeforeUpdated) {
+            dispatchMessage(message, 0);
+        }
+
+        if (entry.replica == TERTIARY && twoBeforeUpdated) {
+            dispatchMessage(message, 0);
+        }
+
+    }
 }
